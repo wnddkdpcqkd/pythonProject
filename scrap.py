@@ -2,32 +2,11 @@ import gspread
 import requests
 import urllib3
 from bs4 import BeautifulSoup
-from googleapiclient.discovery import build
-from google.oauth2.service_account import Credentials
-from typing import Union
-from urllib.parse import urlparse
+from urllib.parse import urljoin
+from urllib3.exceptions import InsecureRequestWarning
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-
-class PostData:
-    def __init__(self, total_count, filtered_count, title_text, post_url):
-        self.total_count = total_count
-        self.filtered_count = filtered_count
-        self.title_text = title_text
-        self.post_url = post_url
-
-    def set_total_count(self, count):
-        self.total_count = count
-
-    def set_filtered_count(self, count):
-        self.filtered_count = count
-
-    def set_title(self, title):
-        self.title_text = title
-
-    def set_post_url(self, url):
-        self.post_url = url
 
 
 def get_link_from_arr(x, index=-1):
@@ -49,37 +28,27 @@ def get_link_from_arr(x, index=-1):
 
 
 def convert_link_format(site_url: str, post_url: str):
-    parsed_url = urlparse(site_url)
-    baseurl = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    for char in post_url:
+        if '\uac00' <= char <= '\ud7a3':  # 한글 음절의 범위
+            return post_url.replace('¤t', '&current')
 
-    if post_url.startswith("/"):
-        return baseurl + post_url
-    elif post_url.startswith("?"):
-        return site_url + post_url
-    elif '../' in post_url:
-        count = post_url.count('../')
-        split_list = parsed_url.path.split('/')
-        path = '/'.join(split_list[:-count+1])
-        new_url = post_url.replace('../', '')
-        return baseurl + path + '/' + new_url
-    elif post_url.startswith('./'):
-        split_list = parsed_url.path.split('/')
-        path = '/'.join(split_list[:-1])
-        return baseurl + path + post_url[1:]
-    else:
-        split_list = parsed_url.path.split('/')
-        path = '/'.join(split_list[:-1])
-        return baseurl + path + '/' + post_url
+    return urljoin(site_url, post_url).replace('¤t', '&current')
 
 
 def get_post_array(site_url, depth1, depth2, href_index):
     # post_array : return 값
     post_array = []
+    try:
+        response = requests.get(site_url, verify=False)
+    except requests.exceptions.SSLError as e:
+        print('SSL Error [보안접근 불가]')
+        return post_array
+    except requests.exceptions.ConnectionError as e:
+        print('Connection Error [연결 오류]')
+        return post_array
 
-    response = requests.get(site_url, verify=False)
     depth1_arr = list(filter(None, depth1.split(',')))
     depth2_arr = list(filter(None, depth2.split(',')))
-
     if response.status_code == 200:
         html_content = response.content
         soup = BeautifulSoup(html_content, 'html.parser')
