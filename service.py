@@ -3,6 +3,13 @@ from google.oauth2.service_account import Credentials
 import gspread
 from datetime import datetime, timedelta
 import pandas as pd
+import os
+
+
+def print_and_save(text, filename="output.txt"):
+    print(text)  # 콘솔에 출력
+    with open(filename, "a") as file:  # 파일에 추가
+        file.write(text + "\n")
 
 
 def get_different_spreadsheet_row(list1, list2, column):
@@ -17,7 +24,9 @@ def get_different_spreadsheet_row(list1, list2, column):
 
 class DriveAndSheetService:
     def __init__(self):
-        service_key_path = './serviceKey.json'
+        path = os.path.abspath(__file__)
+        directory = os.path.dirname(path)
+        service_key_path = os.path.join(directory, 'serviceKey.json')
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         self.credentials = Credentials.from_service_account_file(service_key_path, scopes=scope)
         self.client = gspread.authorize(self.credentials)
@@ -54,6 +63,8 @@ class DriveAndSheetService:
             return spreadsheet
 
     def resize_spread_sheet(self, spreadsheet_id, worksheet_id):
+
+        sheets_api = build('sheets', 'v4', credentials=self.credentials)
         requests = [
             {
                 "updateDimensionProperties": {
@@ -96,7 +107,7 @@ class DriveAndSheetService:
                 }
             }
         ]
-        sheets_api = build('sheets', 'v4', credentials=self.credentials)
+
         res = sheets_api.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests}).execute()
         return res
 
